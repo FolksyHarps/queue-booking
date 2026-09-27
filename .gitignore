@@ -1,0 +1,22 @@
+# Go build output
+*.exe
+*.test
+*.out
+/bin/
+/*/bin/
+
+# Local secrets / overrides
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Generated reports
+reports/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

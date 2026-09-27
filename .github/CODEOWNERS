@@ -1,0 +1,11 @@
+# Each module's owner must review changes to it (enable "Require review from
+# Code Owners" in the branch protection rule for main).
+# TODO: replace the placeholders with real GitHub usernames.
+
+# Shared files: any owner may approve
+*                       @FolksyHarps @member2-github @member3-github @member4-github
+
+/auth-service/          @FolksyHarps
+/service-service/       @member2-github
+/booking-service/       @member3-github
+/notification-service/  @member4-github

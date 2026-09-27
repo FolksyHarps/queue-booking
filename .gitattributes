@@ -1,0 +1,4 @@
+# Keep LF endings so the bash scripts run on every OS (CRLF breaks bash).
+* text=auto eol=lf
+*.sh text eol=lf
+*.pdf binary

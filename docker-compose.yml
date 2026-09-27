@@ -1,0 +1,114 @@
+# Database choice: ONE PostgreSQL container hosting FOUR separate databases
+# (auth_db, service_db, booking_db, notification_db), each owned by its own
+# DB user. Services only receive credentials for their own database, so there
+# is no shared schema and no cross-database foreign keys.
+# See docker/postgres/init.sh (runs only when the volume is first created).
+# Passwords and secrets come from .env (git-ignored); see .env.example.
+
+x-common-env: &common-env
+  TZ: Asia/Bangkok
+  GIN_MODE: release
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?copy .env.example to .env}
+      SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?copy .env.example to .env}
+      BOOKING_DB_PASSWORD: ${BOOKING_DB_PASSWORD:?copy .env.example to .env}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?copy .env.example to .env}
+      TZ: Asia/Bangkok
+    ports:
+      - "5433:5432" 
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notification_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      <<: *common-env
+      PORT: "8081"
+      DB_DSN: host=postgres user=auth_user password=${AUTH_DB_PASSWORD:?copy .env.example to .env} dbname=auth_db port=5432 sslmode=disable TimeZone=UTC
+      JWT_SECRET: ${JWT_SECRET:?copy .env.example to .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?copy .env.example to .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?copy .env.example to .env}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  service-service:
+    build: ./service-service
+    environment:
+      <<: *common-env
+      PORT: "8082"
+      DB_DSN: host=postgres user=service_user password=${SERVICE_DB_PASSWORD:?copy .env.example to .env} dbname=service_db port=5432 sslmode=disable TimeZone=UTC
+      AUTH_SERVICE_URL: http://auth-service:8081
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+
+  booking-service:
+    build: ./booking-service
+    environment:
+      <<: *common-env
+      PORT: "8083"
+      DB_DSN: host=postgres user=booking_user password=${BOOKING_DB_PASSWORD:?copy .env.example to .env} dbname=booking_db port=5432 sslmode=disable TimeZone=UTC
+      AUTH_SERVICE_URL: http://auth-service:8081
+      SERVICE_SERVICE_URL: http://service-service:8082
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?copy .env.example to .env}
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      service-service:
+        condition: service_started
+    restart: unless-stopped
+
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      <<: *common-env
+      PORT: "8084"
+      DB_DSN: host=postgres user=notification_user password=${NOTIFICATION_DB_PASSWORD:?copy .env.example to .env} dbname=notification_db port=5432 sslmode=disable TimeZone=UTC
+      AUTH_SERVICE_URL: http://auth-service:8081
+      BOOKING_SERVICE_URL: http://booking-service:8083
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?copy .env.example to .env}
+      REPORT_DIR: /data/reports
+    ports:
+      - "8084:8084"
+    volumes:
+      - reports:/data/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  reports:

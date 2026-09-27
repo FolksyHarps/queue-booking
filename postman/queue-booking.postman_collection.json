@@ -1,0 +1,2730 @@
+{
+  "info": {
+    "name": "Queue Booking Microservices",
+    "description": "ทุก path ของระบบจองคิวและนัดหมายออนไลน์ (27 paths) + เคส error ตัวอย่าง\n\nรันทั้ง collection ตามลำดับได้ (Run collection): request แรกๆ จะสมัคร/ล็อกอิน แล้วเก็บ token และ id ไว้ใน collection variables ให้ request ถัดไปใช้เอง\n\nต้องรัน `docker compose up -d --build` ก่อน\n\nตัวแปร admin_email, admin_password, internal_key ต้องตรงกับไฟล์ .env (ค่าเริ่มต้นตรงกับ .env.example)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth & User Management (auth-service :8081)",
+      "item": [
+        {
+          "name": "Register customer",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/register",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "201 Created / 400 Bad Request / 409 Conflict (email ซ้ำ)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"สมชาย ใจดี\",\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"secret123\",\n  \"role\": \"customer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"customer_email\", \"customer\" + Date.now() + \"@example.com\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"has fields id, name, email, role, created_at\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"name\");",
+                  "  pm.expect(j).to.have.property(\"email\");",
+                  "  pm.expect(j).to.have.property(\"role\");",
+                  "  pm.expect(j).to.have.property(\"created_at\");",
+                  "});",
+                  "pm.collectionVariables.set(\"customer_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register provider",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/register",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ร้านตัดผม\",\n  \"email\": \"{{provider_email}}\",\n  \"password\": \"secret123\",\n  \"role\": \"provider\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"provider_email\", \"provider\" + Date.now() + \"@example.com\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"provider_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register duplicate email (409)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/register",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ซ้ำ\",\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"secret123\",\n  \"role\": \"customer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login customer",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/login",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "200 OK / 401 Unauthorized",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"secret123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields token, expires_in\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"token\");",
+                  "  pm.expect(j).to.have.property(\"expires_in\");",
+                  "});",
+                  "pm.collectionVariables.set(\"customer_token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login provider",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/login",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{provider_email}}\",\n  \"password\": \"secret123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"provider_token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/login",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"admin_token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login wrong password (401)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/login",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"wrong-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my profile",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{auth_url}}/api/users/me",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "200 OK / 401 Unauthorized"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, name, email, role\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"name\");",
+                  "  pm.expect(j).to.have.property(\"email\");",
+                  "  pm.expect(j).to.have.property(\"role\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update my profile",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/users/me",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "name, phone เป็น optional ทั้งคู่ (ต้องส่งอย่างน้อย 1) — 200 OK / 400 Bad Request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"สมชาย ใจดีมาก\",\n  \"phone\": \"0812345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, name, phone\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"name\");",
+                  "  pm.expect(j).to.have.property(\"phone\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List users (admin)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{auth_url}}/api/users?role=customer&page=1&limit=20",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "customer"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Admin only — 200 OK / 403 Forbidden"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields total, users\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"total\");",
+                  "  pm.expect(j).to.have.property(\"users\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List users as customer (403)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{auth_url}}/api/users",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Suspend user (admin)",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/users/{{customer_id}}/status",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{customer_id}}",
+                "status"
+              ]
+            },
+            "description": "Admin only — status: active / suspended — 200 OK / 403 Forbidden / 404 Not Found",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"suspended\", () => pm.expect(pm.response.json().status).to.eql(\"suspended\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate user (admin)",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_url}}/api/users/{{customer_id}}/status",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{customer_id}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"active\", () => pm.expect(pm.response.json().status).to.eql(\"active\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Service Management (service-service :8082)",
+      "item": [
+        {
+          "name": "Create service (provider)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{service_url}}/api/services",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services"
+              ]
+            },
+            "description": "Provider/Admin — 201 Created / 403 Forbidden / 400 Bad Request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ตัดผมชาย\",\n  \"duration_min\": 30,\n  \"price\": 150,\n  \"category\": \"hair\",\n  \"description\": \"ตัดผมชายทุกทรง\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"has fields id, name, duration_min, price\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"name\");",
+                  "  pm.expect(j).to.have.property(\"duration_min\");",
+                  "  pm.expect(j).to.have.property(\"price\");",
+                  "});",
+                  "pm.collectionVariables.set(\"service_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create service as customer (403)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{service_url}}/api/services",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"x\",\n  \"duration_min\": 30,\n  \"price\": 1,\n  \"category\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List services",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{service_url}}/api/services?category=hair&keyword=ตัดผม",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "hair"
+                },
+                {
+                  "key": "keyword",
+                  "value": "ตัดผม"
+                }
+              ]
+            },
+            "description": "สาธารณะ — query category, keyword เป็น optional"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields services\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"services\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get service",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}"
+              ]
+            },
+            "description": "200 OK / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, name, duration_min, price, provider_id\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"name\");",
+                  "  pm.expect(j).to.have.property(\"duration_min\");",
+                  "  pm.expect(j).to.have.property(\"price\");",
+                  "  pm.expect(j).to.have.property(\"provider_id\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update service",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}"
+              ]
+            },
+            "description": "เจ้าของ/admin — name, duration_min, price เป็น optional — 200 OK / 403 Forbidden / 404 Not Found",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ตัดผมชาย (อัปเดต)\",\n  \"price\": 180\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, name, price\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"name\");",
+                  "  pm.expect(j).to.have.property(\"price\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add availability (tomorrow 09:00-12:00)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}/availability",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}",
+                "availability"
+              ]
+            },
+            "description": "day_of_week 0-6 (อาทิตย์-เสาร์), เวลา HH:MM — 201 Created / 400 Bad Request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": {{day_of_week}},\n  \"start_time\": \"09:00\",\n  \"end_time\": \"12:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = new Date(Date.now() + 24 * 60 * 60 * 1000);",
+                  "const pad = (n) => String(n).padStart(2, \"0\");",
+                  "pm.collectionVariables.set(\"booking_date\", t.getFullYear() + \"-\" + pad(t.getMonth() + 1) + \"-\" + pad(t.getDate()));",
+                  "pm.collectionVariables.set(\"day_of_week\", t.getDay());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"has fields id, service_id, day_of_week, start_time, end_time\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"service_id\");",
+                  "  pm.expect(j).to.have.property(\"day_of_week\");",
+                  "  pm.expect(j).to.have.property(\"start_time\");",
+                  "  pm.expect(j).to.have.property(\"end_time\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get available slots",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}/availability?date={{booking_date}}",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": "query date (YYYY-MM-DD) — 200 OK / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields date, slots\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"date\");",
+                  "  pm.expect(j).to.have.property(\"slots\");",
+                  "});",
+                  "const slots = pm.response.json().slots;",
+                  "pm.test(\"has at least 3 slots\", () => pm.expect(slots.length).to.be.at.least(3));",
+                  "pm.collectionVariables.set(\"slot_1\", slots[0]);",
+                  "pm.collectionVariables.set(\"slot_2\", slots[1]);",
+                  "pm.collectionVariables.set(\"slot_3\", slots[2]);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Booking & Queue (booking-service :8083)",
+      "item": [
+        {
+          "name": "Create booking",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "description": "201 Created / 409 Conflict (คิวเต็ม) / 400 Bad Request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{service_id}},\n  \"date\": \"{{booking_date}}\",\n  \"time\": \"{{slot_1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"has fields id, service_id, date, time, status\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"service_id\");",
+                  "  pm.expect(j).to.have.property(\"date\");",
+                  "  pm.expect(j).to.have.property(\"time\");",
+                  "  pm.expect(j).to.have.property(\"status\");",
+                  "});",
+                  "pm.collectionVariables.set(\"booking_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create booking same slot (409)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{service_id}},\n  \"date\": \"{{booking_date}}\",\n  \"time\": \"{{slot_1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List my bookings",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings?status=pending&page=1&limit=20",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "customer เห็นของตัวเอง, provider เห็นของบริการที่ดูแล, admin เห็นทั้งหมด"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields bookings\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"bookings\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get booking",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{booking_id}}",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{booking_id}}"
+              ]
+            },
+            "description": "200 OK / 403 Forbidden / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, service_id, customer_id, date, time, status\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"service_id\");",
+                  "  pm.expect(j).to.have.property(\"customer_id\");",
+                  "  pm.expect(j).to.have.property(\"date\");",
+                  "  pm.expect(j).to.have.property(\"time\");",
+                  "  pm.expect(j).to.have.property(\"status\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reschedule booking",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{booking_id}}/reschedule",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{booking_id}}",
+                "reschedule"
+              ]
+            },
+            "description": "200 OK / 409 Conflict / 404 Not Found",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_date\": \"{{booking_date}}\",\n  \"new_time\": \"{{slot_2}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, date, time, status\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"date\");",
+                  "  pm.expect(j).to.have.property(\"time\");",
+                  "  pm.expect(j).to.have.property(\"status\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get realtime queue",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/queue/{{service_id}}",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "queue",
+                "{{service_id}}"
+              ]
+            },
+            "description": "คิวของวันนี้ — 200 OK / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields service_id, current_serving, waiting\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"service_id\");",
+                  "  pm.expect(j).to.have.property(\"current_serving\");",
+                  "  pm.expect(j).to.have.property(\"waiting\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel booking",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{booking_id}}/cancel",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{booking_id}}",
+                "cancel"
+              ]
+            },
+            "description": "200 OK / 403 Forbidden / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"cancelled\", () => pm.expect(pm.response.json().status).to.eql(\"cancelled\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create 2nd booking",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{service_id}},\n  \"date\": \"{{booking_date}}\",\n  \"time\": \"{{slot_3}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"booking_id_2\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update booking status (provider)",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{booking_id_2}}/status",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{booking_id_2}}",
+                "status"
+              ]
+            },
+            "description": "Provider — status: in_progress / completed / no_show — 200 OK / 403 Forbidden",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields id, status\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"status\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Add availability for today",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}/availability",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}",
+                "availability"
+              ]
+            },
+            "description": "เปิดรับจองวันนี้ทั้งวัน เพื่อให้จองคิวของวันนี้ได้ (คิวแสดงเฉพาะการจองของวันนี้)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": {{today_dow}},\n  \"start_time\": \"00:00\",\n  \"end_time\": \"23:59\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = new Date();",
+                  "const pad = (n) => String(n).padStart(2, \"0\");",
+                  "pm.collectionVariables.set(\"today_date\", t.getFullYear() + \"-\" + pad(t.getMonth() + 1) + \"-\" + pad(t.getDate()));",
+                  "pm.collectionVariables.set(\"today_dow\", t.getDay());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Get today slots",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}/availability?date={{today_date}}",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{today_date}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "// pick the next two slots that start at least 5 minutes from now",
+                  "const now = new Date(Date.now() + 5 * 60 * 1000);",
+                  "const pad = (n) => String(n).padStart(2, \"0\");",
+                  "const nowHM = pad(now.getHours()) + \":\" + pad(now.getMinutes());",
+                  "const future = pm.response.json().slots.filter((s) => s > nowHM);",
+                  "pm.test(\"at least 2 slots left today (ต้องรันก่อน 23:00)\", () => pm.expect(future.length).to.be.at.least(2));",
+                  "pm.collectionVariables.set(\"today_slot_1\", future[0]);",
+                  "pm.collectionVariables.set(\"today_slot_2\", future[1]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Book today - queue #1",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{service_id}},\n  \"date\": \"{{today_date}}\",\n  \"time\": \"{{today_slot_1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"today_booking_1\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Book today - queue #2",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{service_id}},\n  \"date\": \"{{today_date}}\",\n  \"time\": \"{{today_slot_2}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"today_booking_2\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Queue - 2 waiting",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/queue/{{service_id}}",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "queue",
+                "{{service_id}}"
+              ]
+            },
+            "description": "ยังไม่มีคนกำลังรับบริการ (current_serving = null) และมี 2 คิวรออยู่"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const q = pm.response.json();",
+                  "const b1 = Number(pm.collectionVariables.get(\"today_booking_1\"));",
+                  "const b2 = Number(pm.collectionVariables.get(\"today_booking_2\"));",
+                  "pm.test(\"nobody is being served yet\", () => pm.expect(q.current_serving).to.eql(null));",
+                  "pm.test(\"both bookings are waiting in time order\", () => pm.expect(q.waiting).to.eql([b1, b2]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Provider starts serving #1",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{today_booking_1}}/status",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{today_booking_1}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"in_progress\", () => pm.expect(pm.response.json().status).to.eql(\"in_progress\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Queue - serving #1",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/queue/{{service_id}}",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "queue",
+                "{{service_id}}"
+              ]
+            },
+            "description": "current_serving เปลี่ยนเป็นคิวที่ 1 และเหลือคิวที่ 2 รออยู่"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const q = pm.response.json();",
+                  "const b1 = Number(pm.collectionVariables.get(\"today_booking_1\"));",
+                  "const b2 = Number(pm.collectionVariables.get(\"today_booking_2\"));",
+                  "pm.test(\"queue #1 is being served\", () => pm.expect(q.current_serving).to.eql(b1));",
+                  "pm.test(\"only queue #2 is waiting\", () => pm.expect(q.waiting).to.eql([b2]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Provider completes #1",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{today_booking_1}}/status",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{today_booking_1}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Provider starts serving #2",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{booking_url}}/api/bookings/{{today_booking_2}}/status",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{today_booking_2}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[คิววันนี้] Queue - serving #2",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{booking_url}}/api/queue/{{service_id}}",
+              "host": [
+                "{{booking_url}}"
+              ],
+              "path": [
+                "api",
+                "queue",
+                "{{service_id}}"
+              ]
+            },
+            "description": "คิวที่ 2 กำลังรับบริการ ไม่มีคิวรอแล้ว"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const q = pm.response.json();",
+                  "pm.test(\"queue #2 is being served\", () => pm.expect(q.current_serving).to.eql(Number(pm.collectionVariables.get(\"today_booking_2\"))));",
+                  "pm.test(\"nobody waiting\", () => pm.expect(q.waiting).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Notification & Report (notification-service :8084)",
+      "item": [
+        {
+          "name": "Send notification (internal)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "{{internal_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{notification_url}}/api/notifications/send",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "send"
+              ]
+            },
+            "description": "System/Internal — ต้องมี header X-Internal-Key — channel: email / in-app — 201 Created / 400 Bad Request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": {{booking_id_2}},\n  \"channel\": \"in-app\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"has fields id, booking_id, channel, status\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"id\");",
+                  "  pm.expect(j).to.have.property(\"booking_id\");",
+                  "  pm.expect(j).to.have.property(\"channel\");",
+                  "  pm.expect(j).to.have.property(\"status\");",
+                  "});",
+                  "pm.collectionVariables.set(\"notification_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List my notifications",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/notifications?read=false",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "read",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "query read (optional: true/false) — 200 OK / 401 Unauthorized"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields notifications\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"notifications\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark notification read",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/notifications/{{notification_id}}/read",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notification_id}}",
+                "read"
+              ]
+            },
+            "description": "200 OK / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"read = true\", () => pm.expect(pm.response.json().read).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report summary (admin)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/reports/summary?start_date={{booking_date}}&end_date={{booking_date}}",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "{{booking_date}}"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": "Admin — 200 OK / 403 Forbidden"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields total_bookings, completed, cancelled, no_show\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"total_bookings\");",
+                  "  pm.expect(j).to.have.property(\"completed\");",
+                  "  pm.expect(j).to.have.property(\"cancelled\");",
+                  "  pm.expect(j).to.have.property(\"no_show\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report summary as customer (403)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/reports/summary",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "summary"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancellation rate by service (admin)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/reports/cancellation-rate?service_id={{service_id}}",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "cancellation-rate"
+              ],
+              "query": [
+                {
+                  "key": "service_id",
+                  "value": "{{service_id}}"
+                }
+              ]
+            },
+            "description": "Admin — ใส่ service_id คืน object เดียว ไม่ใส่คืน {\"services\":[...]} — 200 OK / 403 Forbidden"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields service_id, cancellation_rate\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"service_id\");",
+                  "  pm.expect(j).to.have.property(\"cancellation_rate\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancellation rate all services (admin)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/reports/cancellation-rate",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "cancellation-rate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields services\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"services\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export CSV (admin)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{notification_url}}/api/reports/export?type=bookings&start_date={{booking_date}}&end_date={{booking_date}}",
+              "host": [
+                "{{notification_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "bookings"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{booking_date}}"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": "Admin — type: bookings / cancellations — ได้ไฟล์ report.csv (ใน Postman ใช้ Send and Download) — 200 OK / 403 Forbidden"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is CSV\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/csv\"));",
+                  "pm.test(\"has header row\", () => pm.expect(pm.response.text()).to.match(/^id,service_id,date,time,status/));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Cleanup",
+      "item": [
+        {
+          "name": "Delete service",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{provider_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{service_url}}/api/services/{{service_id}}",
+              "host": [
+                "{{service_url}}"
+              ],
+              "path": [
+                "api",
+                "services",
+                "{{service_id}}"
+              ]
+            },
+            "description": "เจ้าของ/admin — 204 No Content / 403 Forbidden / 404 Not Found"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{auth_url}}/api/auth/logout",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "revoke token — 200 OK / 401 Unauthorized"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has fields message\", () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j).to.have.property(\"message\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get profile after logout (401)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{auth_url}}/api/users/me",
+              "host": [
+                "{{auth_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "auth_url",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "service_url",
+      "value": "http://localhost:8082",
+      "type": "string"
+    },
+    {
+      "key": "booking_url",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "notification_url",
+      "value": "http://localhost:8084",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "change-me-admin",
+      "type": "string"
+    },
+    {
+      "key": "internal_key",
+      "value": "change-me-internal-key",
+      "type": "string"
+    },
+    {
+      "key": "today_date",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "today_dow",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "today_slot_1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "today_slot_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "today_booking_1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "today_booking_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "provider_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "provider_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "provider_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "service_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_date",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "day_of_week",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slot_1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slot_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slot_3",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_id_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notification_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
